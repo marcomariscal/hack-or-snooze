@@ -12,6 +12,8 @@ $(async function() {
   const $navUserProfile = $("#nav-user-profile");
   const $userProfile = $("#user-profile");
   const $mainNavLinks = $(".main-nav-links");
+  const $body = $("body");
+  const $nav = $("nav");
 
   // global storyList variable
   let storyList = null;
@@ -23,69 +25,29 @@ $(async function() {
 
   /**
    * Event listener for logging in.
-   *  If successful, we will setup the user instance
+   * If successful, we will set up the user instance
    */
 
-  $loginForm.on("submit", async function(evt) {
-    evt.preventDefault(); // no page-refresh on submit
-
-    // grab the username and password
-    const username = $("#login-username").val();
-    const password = $("#login-password").val();
-
-    // call the login static method to build a user instance
-    try {
-      const userInstance = await User.login(username, password);
-      // set the global user to the user instance
-      currentUser = userInstance;
-      syncCurrentUserToLocalStorage();
-      loginAndSubmitForm();
-    } catch (error) {
-      alert("Username or password are invalid!");
-    }
-  });
+  $loginForm.on("submit", loginFormSubmit);
 
   /**
-   * Event listener for signing up.
-   *  If successful, we will setup a new user instance
+   * Event listener for signing up/creating account.
+   * If successful, we will setup a new user instance
    */
 
-  $createAccountForm.on("submit", async function(evt) {
-    evt.preventDefault(); // no page refresh
-
-    // grab the required fields
-    let name = $("#create-account-name").val();
-    let username = $("#create-account-username").val();
-    let password = $("#create-account-password").val();
-
-    // call the create method, which calls the API and then builds a new user instance
-    // alert the user is the username is already taken if there is an error creating the user
-    try {
-      const newUser = await User.create(username, password, name);
-      currentUser = newUser;
-      syncCurrentUserToLocalStorage();
-      loginAndSubmitForm();
-    } catch (error) {
-      alert("Username is already taken!");
-    }
-  });
+  $createAccountForm.on("submit", createAccount);
 
   /**
    * Log Out Functionality
    */
 
-  $navLogOut.on("click", function() {
-    // empty out local storage
-    localStorage.clear();
-    // refresh the page, clearing memory
-    location.reload();
-  });
+  $navLogOut.on("click", logout);
 
   /**
    * Event Handler for Clicking Login
    */
 
-  $navLogin.on("click", function() {
+  $navLogin.on("click", () => {
     // Show the Login and Create Account Forms
     $loginForm.slideToggle();
     $createAccountForm.slideToggle();
@@ -96,7 +58,7 @@ $(async function() {
    * Event handler for Navigation to Homepage
    */
 
-  $("body").on("click", "#nav-all", async function() {
+  $nav.on("click", "#nav-all", async () => {
     hideElements();
     await generateStories();
     $allStoriesList.show();
@@ -107,15 +69,13 @@ $(async function() {
    * Event handler for nav bar submit click
    */
 
-  $("body").on("click", "#nav-submit", function() {
-    $("#submit-form").toggle();
-  });
+  $nav.on("click", "#nav-submit", () => $submitForm.slideToggle());
 
   /**
    * Event handler for nav bar submit click
    */
 
-  $("body").on("click", "#nav-favorites", function() {
+  $nav.on("click", "#nav-favorites", () => {
     hideElements();
     $favoritedArticles.show();
     generateFavorites();
@@ -125,7 +85,7 @@ $(async function() {
    * Event handler for stories nav bar click
    */
 
-  $("body").on("click", "#nav-my-stories", function() {
+  $nav.on("click", "#nav-my-stories", () => {
     hideElements();
     $ownStories.show();
     generateOwnStories();
@@ -136,13 +96,25 @@ $(async function() {
    * Event handler for user profile nav bar click
    */
 
-  $("body").on("click", "#nav-user-profile", generateUserProfile);
+  $nav.on("click", "#nav-user-profile", generateUserProfile);
 
   /**
-   * Event handler for star icon click when removing favorite
+   * Event handler for favorite icon click and adding favorite
    */
 
-  $("body").on("click", ".fas.fa-trash-alt", removeStory);
+  $body.on("click", ".fa-star.far", addFavorite);
+
+  /**
+   * Event handler for favorite icon click when removing favorite
+   */
+
+  $body.on("click", ".fa-star.fas", removeFavorite);
+
+  /**
+   * Event handler for trash can icon click and removing story
+   */
+
+  $body.on("click", ".fas.fa-trash-alt", removeStory);
 
   async function removeStory() {
     const $trashCan = $(this);
@@ -158,6 +130,7 @@ $(async function() {
     generateOwnStories();
     highlightFavorites();
   }
+
   /**
    * Populate user profile section
    */
@@ -227,14 +200,8 @@ $(async function() {
     generateOwnStories();
   });
 
-  /**
-   * Event handler for star icon click when adding favorite
-   */
-
-  $("body").on("click", ".fa-star.far", addFavorite);
-
   function addFavorite() {
-    // check if the user if logged in, if not then don't allow them to favorite
+    // check if the user is logged in
     if (!currentUser) return;
 
     const $star = $(this);
@@ -244,11 +211,6 @@ $(async function() {
     generateFavorites();
     $star.removeClass("far").addClass("fas");
   }
-  /**
-   * Event handler for star icon click when removing favorite
-   */
-
-  $("body").on("click", ".fa-star.fas", removeFavorite);
 
   function removeFavorite() {
     const $star = $(this);
@@ -260,10 +222,11 @@ $(async function() {
 
   /**
    * A rendering function for user favorites,
-   *  which will generate stories from the favorites and render them.
+   * which will generate stories from the favorites and render them
+   * with the correct class
    */
 
-  async function generateFavorites() {
+  function generateFavorites() {
     // empty out that part of the page
     $favoritedArticles.empty();
 
@@ -280,7 +243,10 @@ $(async function() {
     highlightFavorites();
   }
 
-  async function highlightFavorites() {
+  /**
+   * use appropriate class to highlight currentuser's favorites
+   */
+  function highlightFavorites() {
     const favorites = currentUser.favorites.map(s => s.storyId);
     const $articles = $("li").get();
     const $starIcons = $(".star").children();
@@ -347,6 +313,9 @@ $(async function() {
 
     // update the navigation bar
     showNavForLoggedInUser();
+
+    // show the user's favorites
+    generateFavorites();
   }
 
   /**
@@ -414,7 +383,6 @@ $(async function() {
     $navLogOut.show();
     $navWelcome.show();
     $mainNavLinks.show();
-
     $navUserProfile.text(currentUser.username);
   }
 
@@ -424,6 +392,7 @@ $(async function() {
     $navWelcome.hide();
     $mainNavLinks.hide();
   }
+
   /* simple function to pull the hostname from a URL */
 
   function getHostName(url) {
@@ -446,5 +415,51 @@ $(async function() {
       localStorage.setItem("token", currentUser.loginToken);
       localStorage.setItem("username", currentUser.username);
     }
+  }
+
+  async function createAccount(evt) {
+    evt.preventDefault(); // no page refresh
+
+    // grab the required fields
+    let name = $("#create-account-name").val();
+    let username = $("#create-account-username").val();
+    let password = $("#create-account-password").val();
+
+    // call the create method, which calls the API and then builds a new user instance
+    // alert the user is the username is already taken if there is an error creating the user
+    try {
+      const newUser = await User.create(username, password, name);
+      currentUser = newUser;
+      syncCurrentUserToLocalStorage();
+      loginAndSubmitForm();
+    } catch (error) {
+      alert("Username is already taken!");
+    }
+  }
+
+  async function loginFormSubmit(evt) {
+    evt.preventDefault(); // no page-refresh on submit
+
+    // grab the username and password
+    const username = $("#login-username").val();
+    const password = $("#login-password").val();
+
+    // call the login static method to build a user instance
+    try {
+      const userInstance = await User.login(username, password);
+      // set the global user to the user instance
+      currentUser = userInstance;
+      syncCurrentUserToLocalStorage();
+      loginAndSubmitForm();
+    } catch (error) {
+      alert("Username or password is invalid!");
+    }
+  }
+
+  function logout() {
+    // empty out local storage
+    localStorage.clear();
+    // refresh the page, clearing memory
+    location.reload();
   }
 });
